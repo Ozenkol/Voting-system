@@ -7,144 +7,269 @@
 ### 🔧 Functional Requirements
 - Secure voter authentication using national ID or biometrics.
 - Anonymous voting — identity decoupled from vote.
-- Each voter can submit only one vote.
-- Immutable vote storage and public auditability.
-- Accessible via personal devices and government kiosks.
-- Admin panel for certification and result auditing.
+- One vote per eligible voter.
+- Immutable vote storage with public audit logs.
+- Access via personal devices and secure kiosks.
+- Admin dashboards for real-time tracking and auditing.
 
 ### 🧪 Non-Functional Requirements
 
-| Category          | Requirement                                                                 |
-|------------------|-----------------------------------------------------------------------------|
-| **Scalability**   | Nationwide scale; millions of concurrent users                              |
-| **QPS (Peak)**    | 50K–200K during peak hours                                                  |
-| **P99 Latency**   | < 300ms for vote submission and confirmation                               |
-| **Anonymity**     | Voter identity completely decoupled post-authentication                    |
-| **Consistency**   | Strong consistency for vote writes (via blockchain consensus)              |
-| **Availability**  | 99.999% uptime; 2-week voting period allows for time-based failover        |
-| **Resilience**    | Withstands geopolitical and datacenter-level failures                     |
-| **Security**      | End-to-end encryption, HSMs, secure boot, anti-DDoS                        |
-| **Fault Tolerance** | Supports vote queuing and delayed sync during network partitions         |
-| **Auditability**  | Public Merkle tree or blockchain-based proof of vote history               |
+| Category           | Requirement                                                             |
+|-------------------|--------------------------------------------------------------------------|
+| **Scalability**    | Must support millions of voters concurrently                            |
+| **Availability**   | 99.999% uptime during the 2-week election period                        |
+| **Latency**        | P99 < 300ms for vote submission                                         |
+| **Consistency**    | Strong consistency for vote ledger writes                               |
+| **Anonymity**      | Complete decoupling of voter ID and vote content                        |
+| **Fault Tolerance**| Multi-datacenter with vote buffering during outages                     |
+| **Security**       | Encryption, secure hardware modules (HSM), intrusion detection systems  |
+| **Auditability**   | Public ledger of vote hashes (Merkle Tree / Blockchain)                 |
 
 ---
 
 ## ⚖️ 2. Tradeoffs
 
-| Feature                               | Tradeoff                                                               |
-|--------------------------------------|------------------------------------------------------------------------|
-| Blockchain for immutability          | Increased storage, complexity, and potential latency                   |
-| Regional government datacenters      | More complex synchronization logic                                     |
-| Anonymous tokens (blind signatures)  | Cryptographic complexity, session/state management overhead            |
-| Full auditability                    | Extra resource usage for cryptographic proofs and publishing           |
-| 2-week voting duration               | Defends against surge traffic but requires long-term reliability       |
+| Feature                          | Tradeoff                                                             |
+|----------------------------------|----------------------------------------------------------------------|
+| Regional datacenters             | Improves latency, adds synchronization complexity                    |
+| Blind signatures for anonymity   | Increased cryptographic complexity and performance cost              |
+| Immutable blockchain ledger      | Storage and consensus overhead                                      |
+| Public kiosk voting              | Physical maintenance and security challenges                         |
+| Two-week voting window           | Simplifies load handling but increases operational uptime demands    |
 
 ---
 
-## 📦 3. API Specification (Draft)
+## 🧩 3. Component Services
 
-### 🔐 `/auth/login`
-- `POST`: Accepts credentials → returns auth token
-
-### 🎟 `/token/issue`
-- `POST`: Issues a blind-signed voting token (anonymous)
-
-### 🗳️ `/vote/submit`
-- `POST`: Accepts signed vote payload with token
-
-### 📜 `/audit/proof`
-- `GET`: Returns Merkle proof or blockchain hash for submitted vote
-
-### 📈 `/admin/dashboard`
-- `GET`: Admin view of vote stats and blockchain status
+| Component              | Responsibility                                                      |
+|------------------------|---------------------------------------------------------------------|
+| **Auth Service**       | National ID verification, biometrics, token issuance                |
+| **Token Service**      | Generates blind-signed anonymous tokens                             |
+| **Vote Collector**     | Receives and validates votes, queues for write                      |
+| **Vote Ledger (Blockchain)** | Commits votes immutably; produces public audit proofs             |
+| **Audit Publisher**    | Publicly exposes Merkle tree roots or block hashes                  |
+| **Admin Console**      | Vote monitoring, logs, statistics, anomaly detection                |
+| **Kiosk Agent**        | Handles secure vote casting at public booths                        |
+| **Message Queue (e.g., Kafka)** | Ensures reliable delivery of votes to backend systems           |
+| **Monitoring Stack**   | Prometheus, Grafana, AlertManager for real-time visibility          |
+| **Key Vault / HSM**    | Manages signing keys and secure cryptographic operations            |
 
 ---
 
-## 🧱 4. Data Model & Analytics
+## 🛢️ 4. Databases & Storage
 
-### 🗄️ Data Models
-- `Voter`: `{ voter_id, region, auth_method }` (transient, not linked to vote)
-- `Vote`: `{ token_id, vote_content, timestamp, hash }`
-- `AuditBlock`: `{ block_hash, vote_hashes[], timestamp }`
-
-### 📊 Analytics
-- Vote turnout by region
-- Vote method: mobile vs kiosk
-- Token issuance vs vote submission success
-- Fraudulent token rate and invalid attempts
+| Database/Store              | Purpose                                      |
+|-----------------------------|----------------------------------------------|
+| **PostgreSQL / CockroachDB**| Voter authentication and token logs         |
+| **IPFS / Distributed FS**   | Encrypted vote records, audit materials      |
+| **Blockchain (custom or OSS)** | Vote ledger (append-only, verifiable)     |
+| **Redis / Memcached**       | Temporary token cache and rate-limiting     |
+| **ElasticSearch / Loki**    | Logging and traceability                    |
 
 ---
 
-## ⚠️ 5. Failure Handling, Degradation, and Monitoring
+## 🔄 5. Data Flow (High-Level)
 
-| Component         | Failure Mode                   | Strategy                                                  |
-|------------------|--------------------------------|-----------------------------------------------------------|
-| Auth API         | Unreachable                     | Fallback to federated backup auth provider                |
-| Kiosk            | Power/network failure           | Report to backup, user notified to retry on another kiosk |
-| Blockchain Node  | Consensus delays                | Vote queuing and retry on separate consensus group        |
-| Token Service    | Token exhaustion or DoS         | Rate-limit per IP, cache token availability               |
+```mermaid
+C4Context
+title C1 - National E-Voting System - Context Diagram
 
-### Monitoring Stack
-- **Prometheus + Grafana**: Latency, token issuance, vote writes
-- **AlertManager**: Notify on abnormal patterns
-- **Logs**: Auth failures, voting latency, blockchain commit logs
+Person(citizen, "Citizen", "A voter who uses mobile or kiosk to participate in national elections.")
+Person(admin, "Administrator", "Government official who monitors and manages the election process.")
+System(eVotingSystem, "National E-Voting System", "Handles secure voting, vote storage, and audit.")
+
+System_Ext(nidRegistry, "National ID Registry", "Provides identity verification during authentication.")
+System_Ext(govNet, "Government Network", "Secure internal network connecting government services.")
+
+Rel(citizen, eVotingSystem, "Casts vote via secure channel")
+Rel(admin, eVotingSystem, "Monitors, configures, and audits election system")
+Rel(eVotingSystem, nidRegistry, "Verifies identity using biometric or ID token")
+Rel(eVotingSystem, govNet, "Secure and encrypted government network access")
+
+
+
+```
+
+``` mermaid
+C4Container
+title C2 - National E-Voting System - Container Diagram
+
+System_Boundary(eVotingSystem, "National E-Voting System") {
+  Container(webApp, "Web App", "Vue.js / React", "User interface for casting votes from mobile or kiosks.")
+  Container(authService, "Authentication Service", "Node.js / Python", "Handles identity verification.")
+  Container(tokenService, "Blind Token Service", "Go", "Issues blind tokens to anonymize votes.")
+  Container(voteCollector, "Vote Collector", "Node.js", "Receives and processes anonymized votes.")
+  Container(blockchainLedger, "Blockchain Ledger", "Rust", "Immutable and verifiable vote storage.")
+  Container(auditPublisher, "Audit Publisher", "Node.js", "Publishes public audit trails.")
+  Container(queue, "Kafka Message Queue", "Kafka", "Buffers vote events for ledger insertion.")
+  Container(redis, "Session Cache", "Redis", "Stores user sessions and temporary state.")
+  Container(postgres, "Relational DB", "PostgreSQL", "Stores system and user metadata.")
+  Container(ipfs, "File Storage (IPFS)", "IPFS", "Stores public audit documents.")
+  Container(vault, "Secrets Vault", "HashiCorp Vault", "Manages keys and encryption.")
+  Container(monitoring, "Monitoring & Observability", "Prometheus + Grafana + ELK", "Logs, metrics, and alerts.")
+  Container(adminConsole, "Admin Console", "React", "Allows monitoring and configuration by officials.")
+}
+
+Person(citizen, "Citizen", "Votes through mobile/kiosk")
+Person(admin, "Administrator", "Election monitor")
+
+Rel(citizen, webApp, "Uses to vote")
+Rel(webApp, authService, "Requests identity verification")
+Rel(authService, postgres, "Reads citizen metadata")
+Rel(authService, redis, "Stores session tokens")
+Rel(webApp, tokenService, "Requests blind signature token")
+Rel(webApp, voteCollector, "Sends encrypted vote and token")
+Rel(voteCollector, queue, "Forwards valid vote event")
+Rel(queue, blockchainLedger, "Processes and stores vote immutably")
+Rel(blockchainLedger, auditPublisher, "Sends Merkle roots for publication")
+Rel(auditPublisher, ipfs, "Publishes public audits")
+Rel(admin, adminConsole, "Monitors system and results")
+Rel(adminConsole, monitoring, "Displays logs and metrics")
+
+```
 
 ---
 
-## 🛠️ 6. System Complexity & Maintenance
+## 📦 6. API Specification (Draft)
 
-### 🔍 Complexity Considerations
-- Cryptography and secure token generation
-- Kiosk hardware security + physical access risks
-- Time synchronization for regional clocks
+### `/auth/login`
+- `POST`: Auth via ID or biometric → returns temporary session
 
-### 🧹 Maintenance & Decommissioning
-- Rotate cryptographic keys post-election
-- Archive and sign blockchain for historical record
-- Secure wipe of temporary kiosk and backend storage
+### `/token/issue`
+- `POST`: Voter receives blind-signed token
+
+### `/vote/submit`
+- `POST`: Submit vote anonymously using token
+
+### `/audit/proof`
+- `GET`: Merkle root/hash proof for vote
+
+### `/admin/dashboard`
+- `GET`: Voting stats, errors, system health
+
+---
+
+## 🧱 7. Data Model & Analytics
+
+### 📘 Data Models
+
+#### `VoterSession`
+```json
+{
+  "voter_id": "hashed_id",
+  "authenticated_at": "timestamp",
+  "region": "zone-a"
+}
+```
+
+#### `VoteRecord`
+```json
+{
+  "vote_hash": "sha256(...)",
+  "token_id": "anon-token",
+  "timestamp": "2025-10-10T14:32Z"
+}
+```
+
+#### `Block`
+```json
+{
+  "block_id": "UUID",
+  "vote_hashes": [...],
+  "timestamp": "...",
+  "merkle_root": "..."
+}
+```
+
+### 📈 Analytics
+
+- Turnout % by region
+- Token issuance failure rate
+- Kiosk vs mobile vote share
+- Audit log consistency checks
+- Invalid vote attempts
+
+---
+
+## 🧰 8. Monitoring, Degradation & Fault Handling
+
+### 🔔 Monitoring & Alerting
+
+| Tool             | Metric/Alert                                      |
+|------------------|---------------------------------------------------|
+| Prometheus       | QPS, latency, error rates                         |
+| Grafana          | Voting throughput dashboards                      |
+| AlertManager     | DDoS patterns, high error rates, degraded nodes   |
+| Loki / ELK       | Centralized logs (trace votes, debug issues)      |
+
+### 🔧 Graceful Degradation
+
+- Votes buffered in queue during blockchain delays
+- Redundant Kiosk fallback to paper backup if network fails
+- Token re-issuance after expiration/failure
+- Read-only dashboards during DB failures
+
+---
+
+## 🧠 9. Complexity, Maintenance, and Cost
+
+### 🔍 Complexity
+
+- Cryptographic verification pipelines
+- Byzantine fault tolerance across regional ledgers
+- Multi-device vote casting + synchronization
+- Secure kiosk management and OS hardening
+
+### 🧹 Maintenance
+
+- Key rotation policy post-election
+- Blockchain archiving and validation
+- Secure deletion of temporary caches
+- Regular updates of kiosk firmware
 
 ### 💰 Cost Considerations
-- Hosting (cloud/hybrid with regional data centers)
-- Hardware procurement for kiosks
-- Blockchain validator node management
-- Penetration testing, audits, and bug bounties
+
+- Redundant infrastructure for every region
+- Kiosk purchase and upkeep
+- Cryptography hardware (HSM)
+- Audit and certification expenses
 
 ---
 
-## 🖼️ 7. System Diagrams (Suggested)
+## 🖼️ 10. Visuals to Include
 
-1. **Component Diagram** — Auth, Token Service, Voting Service, Ledger, Audit Publisher
-2. **Sequence Diagram** — Voter → Auth → Token → Vote Submit → Blockchain Write → Audit
-3. **Network Diagram** — Voter → Edge Gateway → Regional Services
-4. **Data Separation Diagram** — Auth Flow vs Vote Flow
-
----
-
-## 🔄 8. Graceful Degradation & Reliability
-
-- All services stateless, backed by durable queues
-- Read-only dashboards during write outages
-- Vote buffering and deferred submission during failures
-- Secure retry mechanisms for token reissue
-- Periodic snapshots of blockchain state
+- ✅ Component Diagram (Service + Data Store + Network)
+- ✅ Data Flow Diagram
+- ✅ Sequence Diagram for Vote Submission
+- ✅ Blockchain Commit Process
 
 ---
 
-## ♾️ 9. Final Notes & Continuous Improvement
+## 🚨 11. Security Model
 
-- Explore use of zk-SNARKs for zero-knowledge proofs
-- Simulate network partitions and Byzantine behavior
-- Periodic load testing under voting week conditions
-- Enhance kiosk accessibility for visually impaired users
-- Design citizen feedback mechanism post-election
+| Layer               | Control Mechanism                                       |
+|---------------------|--------------------------------------------------------|
+| Voter ID/Auth       | Government identity registry or biometric scan         |
+| Token Anonymity     | Blind signatures, rate-limited issuance                |
+| Vote Integrity      | Vote hash, timestamp, and signature                    |
+| Ledger              | Append-only with Merkle proof or consensus chain       |
+| Kiosk Security      | Secure boot, physical locks, OS monitoring             |
+| Network             | TLS, VPN, firewall rules per region                    |
+| Infra Trust Model   | Zero-trust access, MFA for admin                       |
 
 ---
 
-## ✅ Summary Checkpoints
+## 🧪 12. Future Improvements
 
-- [x] Clarified core requirements (QPS, anonymity, consistency, availability)
-- [x] Discussed tradeoffs in architecture and design
-- [x] Drafted basic API interactions
-- [x] Modeled data and analytics
-- [x] Covered fault tolerance, alerting, and auditability
-- [x] Considered maintainability and lifecycle processes
+- Zero-knowledge proofs (zk-SNARKs) for vote inclusion
+- Formal verification of vote path
+- Decentralized validators via community observers
+- QR-based paper audit trail integration
+- Voice-based voting assistant for accessibility
+
+---
+
+
+```mermaid
+
+```
