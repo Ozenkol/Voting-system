@@ -81,6 +81,13 @@ graph LR
 ```
 
 ```mermaid
+
+
+
+```
+
+
+```mermaid
 graph TD
     A[User Requests via API Gateway] --> B[Load Balancer]
     B --> C[Authentication Service]
@@ -111,24 +118,64 @@ graph TD
 
 ```
 
+```mermaid
+C4Context
+Person(citizen, "Citizen", "Eligible voter using mobile, PC, or public kiosk to vote")
+Person(governmentAdmin, "Government Admin", "Manages and monitors election process")
+System(eVotingSystem, "National e-Voting System", "A secure, distributed voting platform for national elections")
+
+System_Ext(nationalIDSystem, "National ID System", "Verifies identities of citizens via national registry")
+System_Ext(notificationGateway, "Notification Gateway", "Delivers email/SMS or push messages")
+System_Ext(blockchainAuditor, "Public Blockchain Verifier", "External read access for public audit and verification")
+
+Rel(citizen, eVotingSystem, "Casts vote, receives updates", "Web / Mobile / Kiosk Interface")
+Rel(governmentAdmin, eVotingSystem, "Monitors votes, generates reports", "Admin Dashboard")
+
+Rel(eVotingSystem, nationalIDSystem, "Verifies voter identity", "REST API")
+Rel(eVotingSystem, notificationGateway, "Sends voting confirmations and alerts", "Webhooks / Push / Email")
+Rel(eVotingSystem, blockchainAuditor, "Publishes anonymized vote data", "Blockchain API")
+
+```
+
 
 ```mermaid
 C4Container
-System_Boundary(eVotingSystem, "National E-Voting System") {
-  Container(webApp, "Web App", "Vue.js / React", "User interface for casting votes from mobile or kiosks.")
-  Container(authService, "Authentication Service", "Node.js / Python", "Handles identity verification.")
-  Container(tokenService, "Blind Token Service", "Go", "Issues blind tokens to anonymize votes.")
-  Container(voteCollector, "Vote Collector", "Node.js", "Receives and processes anonymized votes.")
-  Container(blockchainLedger, "Blockchain Ledger", "Rust", "Immutable and verifiable vote storage.")
-  Container(auditPublisher, "Audit Publisher", "Node.js", "Publishes public audit trails.")
-  Container(queue, "Kafka Message Queue", "Kafka", "Buffers vote events for ledger insertion.")
-  Container(redis, "Session Cache", "Redis", "Stores user sessions and temporary state.")
-  Container(postgres, "Relational DB", "PostgreSQL", "Stores system and user metadata.")
-  Container(ipfs, "File Storage (IPFS)", "IPFS", "Stores public audit documents.")
-  Container(vault, "Secrets Vault", "HashiCorp Vault", "Manages keys and encryption.")
-  Container(monitoring, "Monitoring & Observability", "Prometheus + Grafana + ELK", "Logs, metrics, and alerts.")
-  Container(adminConsole, "Admin Console", "React", "Allows monitoring and configuration by officials.")
+System_Boundary(eVotingSystem, "National e-Voting System") {
+    Container(webApp, "Web Application", "Vue.js / Nuxt", "Interface for voters on desktop, mobile, and kiosks")
+    Container(authService, "Authentication Service", "Keycloak / OAuth 2.0", "Manages voter identity verification and secure login")
+    Container(voteService, "Vote Recording Service", "Go / Rust", "Handles secure vote submission and blockchain writing")
+    Container(auditService, "Audit Log Service", "Node.js", "Stores immutable system logs and actions")
+    Container(notificationService, "Notification Service", "Firebase / WebSockets", "Sends updates to users")
+    Container(analyticsService, "Analytics Service", "Python / Spark", "Processes and analyzes vote data patterns")
+    ContainerDb(userDb, "User Database", "PostgreSQL", "Stores citizen identities and login metadata")
+    ContainerDb(voteDb, "Vote Ledger", "Private Blockchain", "Immutable, anonymized record of all votes")
+    ContainerDb(auditDb, "Audit Logs DB", "MongoDB / Cassandra", "Stores audit logs for transparency")
+    ContainerDb(cacheLayer, "Cache Layer", "Redis", "Caches frequent queries and sessions")
+    Container(queue, "Message Queue", "Apache Kafka", "Asynchronous communication between services")
+    Container(gateway, "API Gateway", "NGINX / Kong", "Entry point for all API requests")
+    Container(loadBalancer, "Load Balancer", "HAProxy / AWS ELB", "Distributes load across services")
 }
+
+Person(citizen, "Citizen", "Eligible voter using mobile, PC, or public kiosk")
+Person(governmentAdmin, "Government Admin", "Manages election process and oversight")
+
+Rel(citizen, gateway, "Uses", "HTTPS")
+Rel(gateway, webApp, "Delivers frontend")
+Rel(gateway, authService, "Handles auth requests")
+Rel(gateway, voteService, "Submits vote securely")
+Rel(gateway, auditService, "Logs activity")
+Rel(gateway, notificationService, "Receives real-time updates")
+Rel(gateway, analyticsService, "Fetches statistical insights")
+
+Rel(authService, userDb, "Reads & verifies user data", "SQL")
+Rel(voteService, voteDb, "Writes vote to ledger", "Blockchain API")
+Rel(auditService, auditDb, "Writes logs", "NoSQL")
+Rel(notificationService, cacheLayer, "Caches messages", "Redis protocol")
+Rel(analyticsService, queue, "Streams events", "Kafka protocol")
+Rel(queue, analyticsService, "Feeds back analytics tasks")
+Rel(analyticsService, voteDb, "Reads vote patterns", "Blockchain Read API")
+Rel(analyticsService, userDb, "Fetches anonymized data", "SQL")
+Rel(governmentAdmin, analyticsService, "Views election insights", "HTTP")
 ```
 
 ---
